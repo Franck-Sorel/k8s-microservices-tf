@@ -1,0 +1,499 @@
+version: '3'
+
+projects:
+  name: k3d-platform
+  description: Local Kubernetes Platform Bootstrap
+
+settings:
+  dotenv: [.platform/state/.env.local]
+  colors: true
+
+vars:
+  CLUSTER_NAME: dev
+
+tasks:
+  # ===========================================================
+  # CHECK & STATUS
+  # ===========================================================
+  check:
+    desc: Check prerequisites and current state
+    cmds:
+      - task: _check-prereqs
+      - task: _check-cluster
+      - task: status
+
+  _check-prereqs:
+    desc: Verify required tools
+    cmds:
+      - name: prereqs
+        cmd: |
+          for cmd in docker kubectl helm; do
+            which $cmd >/dev/null 2>&1 || { echo "$cmd not found"; exit 1; }
+          done
+          echo "Core prerequisites found"
+
+  _check-cluster:
+    desc: Show cluster info
+    cmds:
+      - name: clusters
+        cmd: k3d cluster list 2>/dev/null || echo "No clusters"
+      - name: context
+        cmd: kubectl config current-context 2>/dev/null && echo "" || true
+
+  # ===========================================================
+  # CLUSTER MANAGEMENT
+  # ===========================================================
+  cluster-create:
+    desc: Create a new k3d cluster
+    vars:
+      CLUSTER_NAME: dev
+    cmds:
+      - name: create
+        cmd: k3d cluster create {{.CLUSTER_NAME}} --agents 1 -p "8080:80@loadbalancer" -p "8443:443@loadbalancer"
+
+  cluster-delete:
+    desc: Delete a k3d cluster
+    vars:
+      CLUSTER_NAME: dev
+    cmds:
+      - name: delete
+        cmd: k3d cluster delete {{.CLUSTER_NAME}}
+
+  cluster-list:
+    desc: List available clusters
+    cmds:
+      - name: list
+        cmd: k3d cluster list
+
+  cluster-use:
+    desc: Switch to a cluster context
+    vars:
+      CLUSTER_NAME: dev
+    cmds:
+      - name: use
+        cmd: kubectl config use-context k3d-{{.CLUSTER_NAME}}
+
+  # ===========================================================
+  # PROFILES
+  # ===========================================================
+  profile:
+    desc: Apply a profile (minimal, auth, storage, ai, full)
+    vars:
+      PROFILE: minimal
+    cmds:
+      - task: _init-repos
+      - cmd: |
+          case "{{.PROFILE}}" in
+            minimal)
+              task _apply-cert-manager
+              ;;
+            auth)
+              task _apply-cert-manager
+              task _apply-keycloak-db
+              task _apply-keycloak
+              ;;
+            storage)
+              task _apply-minio
+              ;;
+            ai|full)
+              task apply-full
+              ;;
+            *)
+              echo "Unknown profile: {{.PROFILE}}"
+              exit 1
+              ;;
+          esac
+
+  # ===========================================================
+  # INSTALL COMMANDS
+  # ===========================================================
+  up:
+    desc: Install platform (cluster + components)
+    cmds:
+      - task: _init-repos
+      - task: apply
+
+  install:
+    desc: Install components (minimal)
+    cmds:
+      - task: _init-repos
+      - task: apply
+
+  apply:
+    desc: Install core components
+    cmds:
+      - task: _apply-cert-manager
+
+  apply-full:
+    desc: Install all components
+    cmds:
+      - task: _init-repos
+      - task: _apply-cert-manager
+      - task: _apply-traefik
+      - task: _apply-cnpg
+      - task: _apply-minio
+      - task: _apply-redis
+      - task: _apply-keycloak-db
+      - task: _apply-keycloak
+
+  # ===========================================================
+  # STATE-BASED APPLY
+  # ===========================================================
+  apply-state:
+    desc: Apply state from platform.yaml
+    vars:
+      FILE: platform.yaml
+    cmds:
+      - task: _init-repos
+      - cmd: |
+          if [ -f "{{.FILE}}" ]; then
+            echo "Reading {{.FILE}}..."
+            # Parse and apply based on platform.yaml
+            # For now, basic implementation
+            task _init-repos
+          else
+            echo "File {{.FILE}} not found"
+            exit 1
+          fi
+
+  # ===========================================================
+  # REMOVE COMMANDS
+  # ===========================================================
+  remove:
+    desc: Remove all releases
+    cmds:
+      - task: _remove-all
+
+  destroy:
+    desc: Destroy platform (releases + cluster)
+    cmds:
+      - task: _remove-all
+      - task: cluster-delete
+
+  # ===========================================================
+  # WIZARD
+  # ===========================================================
+  wizard:
+    desc: Interactive component wizard
+    cmds:
+      - task: _init-repos
+      - cmd: bash ./scripts/wizard.sh
+
+  # ===========================================================
+  # STATUS
+  # ===========================================================
+  status:
+    desc: Show platform status
+    cmds:
+      - name: clusters
+        cmd: k3d cluster list
+      - name: releases
+        cmd: helm list -A --short 2>/dev/null | grep -v "^$" || true
+      - name: pods
+        cmd: kubectl get pods -A 2>/dev/null || true
+      - name: services
+        cmd: kubectl get svc -A 2>/dev/null | head -30 || true
+
+  # ===========================================================
+  # COMPONENT STATUS
+  # ===========================================================
+  status-cert-manager:
+    desc: Status of cert-manager
+    cmds:
+      - cmd: kubectl get pods,svc -n cert-manager
+
+  status-traefik:
+    desc: Status of Traefik
+    cmds:
+      - cmd: kubectl get pods,svc -n traefik 2>/dev/null || echo "Not installed"
+
+  status-cnpg:
+    desc: Status of CNPG
+    cmds:
+      - cmd: kubectl get pods,svc -n cnpg-system 2>/dev/null || echo "Not installed"
+
+  status-minio:
+    desc: Status of MinIO
+    cmds:
+      - cmd: kubectl get pods,svc -n minio 2>/dev/null || echo "Not installed"
+
+  status-redis:
+    desc: Status of Redis
+    cmds:
+      - cmd: kubectl get pods,svc -n redis 2>/dev/null || echo "Not installed"
+
+  status-keycloak:
+    desc: Status of Keycloak
+    cmds:
+      - cmd: kubectl get pods,svc -n keycloak 2>/dev/null || echo "Not installed"
+
+  status-keycloak-db:
+    desc: Status of Keycloak DB
+    cmds:
+      - cmd: kubectl get pods,svc -n keycloak-db 2>/dev/null || echo "Not installed"
+
+  status-librechat:
+    desc: Status of LibreChat
+    cmds:
+      - cmd: kubectl get pods,svc -n librechat 2>/dev/null || echo "Not installed"
+
+  # ===========================================================
+  # PORT FORWARD
+  # ===========================================================
+  port-forward:
+    desc: Port forward to a service
+    vars:
+      COMPONENT: keycloak
+      PORT: 8080
+    cmds:
+      - cmd: |
+          case "{{.COMPONENT}}" in
+            keycloak)
+              echo "Keycloak: kubectl port-forward -n keycloak svc/keycloak-http 8080:80"
+              kubectl port-forward -n keycloak svc/keycloak-http 8080:80 &
+              ;;
+            minio)
+              echo "MinIO: kubectl port-forward -n minio svc/minio 9000:80"
+              kubectl port-forward -n minio svc/minio 9000:80 &
+              ;;
+            librechat)
+              echo "LibreChat: kubectl port-forward -n librechat svc/librechat-librechat 3080:80"
+              kubectl port-forward -n librechat svc/librechat-librechat 3080:80 &
+              ;;
+            traefik)
+              echo "Traefik: kubectl port-forward -n traefik svc/traefik 8080:80"
+              kubectl port-forward -n traefik svc/traefik 8080:80 &
+              ;;
+            redis)
+              echo "Redis: kubectl port-forward -n redis svc/redis 6379:6379"
+              kubectl port-forward -n redis svc/redis 6379:6379 &
+              ;;
+            *)
+              echo "Unknown component: {{.COMPONENT}}"
+              ;;
+          esac
+
+  # ===========================================================
+  # BOOTSTRAP
+  # ===========================================================
+  bootstrap-keycloak:
+    desc: Bootstrap Keycloak with test realm
+    cmds:
+      - cmd: |
+          echo "Bootstrap Keycloak..."
+          # Create test realm
+          kubectl apply -f manifests/keycloak-realm.yaml 2>/dev/null || echo "Realm manifest not found"
+
+  # ===========================================================
+  # HELM REPOS
+  # ===========================================================
+  _init-repos:
+    desc: Initialize helm repos
+    cmds:
+      - name: repos
+        cmd: |
+          helm repo add jetstack https://charts.jetstack.io 2>/dev/null || true
+          helm repo add codecentric https://codecentric.github.io/helm-charts 2>/dev/null || true
+          helm repo add bitnami https://charts.bitnami.com/bitnami 2>/dev/null || true
+          helm repo add cloudnative-pg https://cloudnative-pg.github.io/charts 2>/dev/null || true
+          helm repo add traefik https://traefik.github.io/charts 2>/dev/null || true
+          helm repo update 2>/dev/null || true
+          echo "Repos ready"
+
+  # ===========================================================
+  # COMPONENT: cert-manager
+  # ===========================================================
+  _apply-cert-manager:
+    desc: Install cert-manager
+    cmds:
+      - name: ns
+        cmd: kubectl create namespace cert-manager 2>/dev/null || true
+      - name: install
+        cmd: |
+          helm upgrade --install cert-manager jetstack/cert-manager \
+            --namespace cert-manager \
+            --version v1.15.0 \
+            --set crds.enabled=true \
+            --wait --timeout 5m
+
+  _remove-cert-manager:
+    desc: Remove cert-manager
+    cmds:
+      - cmd: helm uninstall cert-manager -n cert-manager 2>/dev/null || true
+
+  # ===========================================================
+  # COMPONENT: Traefik
+  # ===========================================================
+  _apply-traefik:
+    desc: Install Traefik
+    cmds:
+      - name: ns
+        cmd: kubectl create namespace traefik 2>/dev/null || true
+      - name: install
+        cmd: |
+          helm upgrade --install traefik traefik/traefik \
+            --namespace traefik \
+            --version 30.0.0 \
+            --set ports.web.port=80 \
+            --set ports.websecure.port=443 \
+            --set ports.traefik.port=9000 \
+            --set securityContext.runAsNonRoot=false \
+            --set securityContext.allowPrivilegeEscalation=false \
+            --wait --timeout 5m
+
+  _remove-traefik:
+    desc: Remove Traefik
+    cmds:
+      - cmd: helm uninstall traefik -n traefik 2>/dev/null || true
+
+  # ===========================================================
+  # COMPONENT: CNPG
+  # ===========================================================
+  _apply-cnpg:
+    desc: Install CloudNativePG
+    cmds:
+      - name: ns
+        cmd: kubectl create namespace cnpg-system 2>/dev/null || true
+      - name: install
+        cmd: |
+          helm upgrade --install cnpg cloudnative-pg/cloudnative-pg \
+            --namespace cnpg-system \
+            --version 1.22.1 \
+            --wait --timeout 5m
+
+  _remove-cnpg:
+    desc: Remove CNPG
+    cmds:
+      - cmd: helm uninstall cnpg -n cnpg-system 2>/dev/null || true
+
+  # ===========================================================
+  # COMPONENT: MinIO
+  # ===========================================================
+  _apply-minio:
+    desc: Install MinIO
+    cmds:
+      - name: ns
+        cmd: kubectl create namespace minio 2>/dev/null || true
+      - name: install
+        cmd: |
+          helm upgrade --install minio bitnami/minio \
+            --namespace minio \
+            --version 7.0.6 \
+            --set auth.rootUser=minioadmin \
+            --set auth.rootPassword=minioadmin \
+            --set service.type=ClusterIP \
+            --set persistence.size=5Gi \
+            --wait --timeout 5m
+
+  _remove-minio:
+    desc: Remove MinIO
+    cmds:
+      - cmd: helm uninstall minio -n minio 2>/dev/null || true
+
+  # ===========================================================
+  # COMPONENT: Redis
+  # ===========================================================
+  _apply-redis:
+    desc: Install Redis
+    cmds:
+      - name: ns
+        cmd: kubectl create namespace redis 2>/dev/null || true
+      - name: install
+        cmd: |
+          helm upgrade --install redis bitnami/redis \
+            --namespace redis \
+            --version 20.0.1 \
+            --set auth.password=redis123 \
+            --set architecture=standalone \
+            --set master.persistence.size=2Gi \
+            --set resources.requests.memory=128Mi \
+            --set service.type=ClusterIP \
+            --wait --timeout 5m
+
+  _remove-redis:
+    desc: Remove Redis
+    cmds:
+      - cmd: helm uninstall redis -n redis 2>/dev/null || true
+
+  # ===========================================================
+  # COMPONENT: Keycloak DB
+  # ===========================================================
+  _apply-keycloak-db:
+    desc: Install Keycloak PostgreSQL
+    cmds:
+      - name: ns
+        cmd: kubectl create namespace keycloak-db 2>/dev/null || true
+      - name: install
+        cmd: |
+          helm upgrade --install keycloak-db bitnami/postgresql \
+            --namespace keycloak-db \
+            --set auth.username=keycloak \
+            --set auth.password=keycloak123 \
+            --set auth.database=keycloak \
+            --set primary.persistence.size=5Gi \
+            --wait --timeout 5m
+
+  _remove-keycloak-db:
+    desc: Remove Keycloak PostgreSQL
+    cmds:
+      - cmd: helm uninstall keycloak-db -n keycloak-db 2>/dev/null || true
+
+  # ===========================================================
+  # COMPONENT: Keycloak
+  # ===========================================================
+  _apply-keycloak:
+    desc: Install Keycloak
+    cmds:
+      - name: ns
+        cmd: kubectl create namespace keycloak 2>/dev/null || true
+      - name: install
+        cmd: |
+          helm upgrade --install keycloak codecentric/keycloak \
+            --namespace keycloak \
+            --version 32.0.0 \
+            --set postgresql.enabled=false \
+            --set 'extraEnvVars[0].name=KC_DB_URL' \
+            --set 'extraEnvVars[0].value=jdbc:postgresql://keycloak-db-postgresql.keycloak-db.svc.cluster.local:5432/keycloak' \
+            --set 'extraEnvVars[1].name=KC_DB_USERNAME' \
+            --set 'extraEnvVars[1].value=keycloak' \
+            --set 'extraEnvVars[2].name=KC_DB_PASSWORD' \
+            --set 'extraEnvVars[2].value=keycloak123' \
+            --wait --timeout 10m
+
+  _remove-keycloak:
+    desc: Remove Keycloak
+    cmds:
+      - cmd: helm uninstall keycloak -n keycloak 2>/dev/null || true
+
+  # ===========================================================
+  # COMPONENT: LibreChat
+  # ===========================================================
+  _apply-librechat:
+    desc: Install LibreChat
+    cmds:
+      - name: ns
+        cmd: kubectl create namespace librechat 2>/dev/null || true
+      - name: install
+        cmd: |
+          helm upgrade --install librechat oci://ghcr.io/danny-avila/librechat-chart/librechat \
+            --namespace librechat \
+            --version 0.1.0 \
+            --wait --timeout 10m
+
+  _remove-librechat:
+    desc: Remove LibreChat
+    cmds:
+      - cmd: helm uninstall librechat -n librechat 2>/dev/null || true
+
+  # ===========================================================
+  # REMOVE ALL
+  # ===========================================================
+  _remove-all:
+    desc: Remove all releases
+    cmds:
+      - cmd: |
+          for rel in cert-manager traefik cnpg minio redis keycloak keycloak-db librechat; do
+            helm uninstall $rel -n ${rel} 2>/dev/null || true
+            helm uninstall $rel -n ${rel}-db 2>/dev/null || true
+          done
+          echo "All releases removed"

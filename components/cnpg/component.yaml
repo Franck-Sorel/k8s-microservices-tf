@@ -1,0 +1,14 @@
+name: cnpg
+category: database
+description: PostgreSQL operator
+namespace: cnpg-system
+enabled_by_default: false
+profiles: [auth, ai, full]
+depends_on: []
+conflicts_with: []
+install_task: _apply-cnpg
+remove_task: _remove-cnpg
+status_task: _status-cnpg
+resources:
+  memory: 128Mi
+  cpu: 100m

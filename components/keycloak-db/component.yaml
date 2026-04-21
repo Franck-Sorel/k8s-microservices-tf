@@ -1,0 +1,17 @@
+name: keycloak-db
+category: database
+description: PostgreSQL for Keycloak
+namespace: keycloak-db
+enabled_by_default: false
+profiles: [auth, ai, full]
+depends_on: []
+conflicts_with: []
+install_task: _apply-keycloak-db
+remove_task: _remove-keycloak-db
+status_task: _status-keycloak-db
+resources:
+  memory: 256Mi
+  cpu: 100m
+credentials:
+  username: keycloak
+  password: keycloak123

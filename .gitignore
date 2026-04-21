@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+.terraform.lock.hcl
+
+# Helm
+*.tgz
+.helm/
+helm.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local state
+.platform/state/
+.env
+.env.local
+
+# Build
+dist/
+build/
+
+# Logs
+*.log
+
+# Temp
+tmp/
+temp/
+*.tmp

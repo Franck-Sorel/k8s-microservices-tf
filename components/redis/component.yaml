@@ -1,0 +1,14 @@
+name: redis
+category: cache
+description: In-memory data store
+namespace: redis
+enabled_by_default: false
+profiles: [ai, full]
+depends_on: []
+conflicts_with: []
+install_task: _apply-redis
+remove_task: _remove-redis
+status_task: _status-redis
+resources:
+  memory: 128Mi
+  cpu: 50m

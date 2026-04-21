@@ -1,0 +1,14 @@
+{{- if .Values.ENABLE_MINIO }}
+mode: standalone
+
+auth:
+  rootUser: minioadmin
+  rootPassword: minioadmin
+
+service:
+  type: ClusterIP
+
+persistence:
+  enabled: true
+  size: 10Gi
+{{- end }}

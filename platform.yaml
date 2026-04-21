@@ -1,0 +1,22 @@
+# Platform Descriptor
+# Use: task apply-state
+cluster:
+  name: dev
+
+# Component selection
+components:
+  traefik: false
+  cert-manager: true
+  cnpg: false
+  minio: false
+  keycloak-db: false
+  keycloak: false
+  redis: false
+  librechat: false
+
+# Local domain suffix
+domain: localtest.me
+
+# Resource limits (for local development)
+resources:
+  ultra_light: true

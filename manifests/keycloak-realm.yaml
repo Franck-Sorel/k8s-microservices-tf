@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-realm-import
+  namespace: keycloak
+data:
+  realm.json: |
+    {
+      "realm": "dev",
+      "enabled": true,
+      "displayName": "Development",
+      "accessTokenLifespan": 300,
+      "ssoSessionIdleTimeout": 1800,
+      "ssoSessionMaxLifespan": 36000,
+      "clients": [
+        {
+          "clientId": "test-app",
+          "enabled": true,
+          "publicClient": false,
+          "bearerOnly": false,
+          "standardFlowEnabled": true,
+          "implicitFlowEnabled": false,
+          "directAccessGrantsEnabled": true,
+          "serviceAccountsEnabled": true,
+          "redirectUris": ["http://localhost:3000/*", "http://localhost:8080/*"],
+          "webOrigins": ["*"],
+          "attributes": {
+            "access.token.lifespan": "300"
+          }
+        }
+      ],
+      "users": [
+        {
+          "username": "admin",
+          "enabled": true,
+          "emailVerified": true,
+          "email": "admin@local.test",
+          "firstName": "Admin",
+          "lastName": "User",
+          "credentials": [
+            {
+              "type": "password",
+              "value": "admin",
+              "temporary": false
+            }
+          ],
+          "realmRoles": ["admin"],
+          "clientRoles": {
+            "test-app": ["admin"]
+          }
+        },
+        {
+          "username": "testuser",
+          "enabled": true,
+          "emailVerified": true,
+          "email": "test@local.test",
+          "firstName": "Test",
+          "lastName": "User",
+          "credentials": [
+            {
+              "type": "password",
+              "value": "test123",
+              "temporary": false
+            }
+          ],
+          "realmRoles": ["user"]
+        }
+      ],
+      "roles": {
+        "realm": [
+          {
+            "name": "user",
+            "description": "Standard user role"
+          },
+          {
+            "name": "admin",
+            "description": "Administrator role"
+          }
+        ]
+      }
+    }

@@ -1,0 +1,18 @@
+name: keycloak
+category: identity
+description: Identity and access management
+namespace: keycloak
+enabled_by_default: false
+profiles: [auth, ai, full]
+depends_on: [keycloak-db]
+conflicts_with: []
+install_task: _apply-keycloak
+remove_task: _remove-keycloak
+status_task: _status-keycloak
+bootstrap_task: _bootstrap-keycloak
+resources:
+  memory: 512Mi
+  cpu: 250m
+credentials:
+  admin_user: admin
+  admin_password: keycloak123

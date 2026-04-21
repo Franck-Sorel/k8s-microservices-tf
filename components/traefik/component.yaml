@@ -1,0 +1,14 @@
+name: traefik
+category: networking
+description: Kubernetes ingress controller
+namespace: traefik
+enabled_by_default: false
+profiles: [ai, full]
+depends_on: []
+conflicts_with: []
+install_task: _apply-traefik
+remove_task: _remove-traefik
+status_task: _status-traefik
+resources:
+  memory: 128Mi
+  cpu: 100m

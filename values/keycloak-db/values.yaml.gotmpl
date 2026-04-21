@@ -1,0 +1,10 @@
+{{- if .Values.ENABLE_KEYCLOAK_DB }}
+auth:
+  username: keycloak
+  password: {{ randAlphaNum 16 }}
+  database: keycloak
+
+primary:
+  persistence:
+    size: 5Gi
+{{- end }}

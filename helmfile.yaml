@@ -1,0 +1,142 @@
+# Platform Helmfile
+# Usage: helmfile -e <environment> sync
+
+environments:
+  default:
+    missingFileHandler: Warn
+
+  minimal:
+    values:
+      - ENABLE_CERT_MANAGER: true
+      - ENABLE_CNPG: false
+      - ENABLE_MINIO: false
+      - ENABLE_KEYCLOAK: false
+      - ENABLE_KEYCLOAK_DB: false
+      - ENABLE_LIBRECHAT: false
+
+  auth:
+    values:
+      - ENABLE_CERT_MANAGER: true
+      - ENABLE_CNPG: true
+      - ENABLE_MINIO: false
+      - ENABLE_KEYCLOAK: true
+      - ENABLE_KEYCLOAK_DB: true
+      - ENABLE_LIBRECHAT: false
+
+  storage:
+    values:
+      - ENABLE_CERT_MANAGER: false
+      - ENABLE_CNPG: false
+      - ENABLE_MINIO: true
+      - ENABLE_KEYCLOAK: false
+      - ENABLE_KEYCLOAK_DB: false
+      - ENABLE_LIBRECHAT: false
+
+  ai:
+    values:
+      - ENABLE_CERT_MANAGER: true
+      - ENABLE_CNPG: true
+      - ENABLE_MINIO: true
+      - ENABLE_KEYCLOAK: true
+      - ENABLE_KEYCLOAK_DB: true
+      - ENABLE_LIBRECHAT: true
+
+  full:
+    values:
+      - ENABLE_CERT_MANAGER: true
+      - ENABLE_CNPG: true
+      - ENABLE_MINIO: true
+      - ENABLE_KEYCLOAK: true
+      - ENABLE_KEYCLOAK_DB: true
+      - ENABLE_LIBRECHAT: true
+
+# Release templates
+templated:
+  &default_release
+    namespace: {{ .Release.Namespace }}
+    missingFileHandler: Warn
+    values:
+      - values/{{ .Release.Name }}/values.yaml.gotmpl
+    {{- if eq .Environment.Name "default" }}
+    --skip-sync
+    {{- end }}
+
+---
+
+repositories:
+  - name: jetstack
+    url: https://charts.jetstack.io
+  - name: codecentric
+    url: https://codecentric.github.io/helm-charts
+  - name: bitnami
+    url: https://charts.bitnami.com/bitnami
+  - name: cloudnative-pg
+    url: https://cloudnative-pg.github.io/charts
+
+# Core releases
+releases:
+  # cert-manager
+  - name: cert-manager
+    <<: *default_release
+    namespace: cert-manager
+    chart: jetstack/cert-manager
+    version: v1.15.0
+    condition: ENABLE_CERT_MANAGER
+    labels:
+      tier: core
+
+  # CloudNativePG
+  - name: cnpg
+    <<: *default_release
+    namespace: cnpg-system
+    chart: cloudnative-pg/cloudnative-pg
+    version: 1.22.1
+    condition: ENABLE_CNPG
+    labels:
+      tier: storage
+
+  # MinIO
+  - name: minio
+    <<: *default_release
+    namespace: minio
+    chart: bitnami/minio
+    version: 7.0.6
+    condition: ENABLE_MINIO
+    labels:
+      tier: storage
+    values:
+      - values/minio/values.yaml.gotmpl
+
+  # Keycloak DB (PostgreSQL)
+  - name: keycloak-db
+    <<: *default_release
+    namespace: keycloak-db
+    chart: bitnami/postgresql
+    version: 18.5.24
+    condition: ENABLE_KEYCLOAK_DB
+    labels:
+      tier: auth
+    values:
+      - values/keycloak-db/values.yaml.gotmpl
+
+  # Keycloak
+  - name: keycloak
+    <<: *default_release
+    namespace: keycloak
+    chart: codecentric/keycloak
+    version: 32.0.0
+    condition: ENABLE_KEYCLOAK
+    labels:
+      tier: auth
+    values:
+      - values/keycloak/values.yaml.gotmpl
+
+  # LibreChat
+  - name: librechat
+    <<: *default_release
+    namespace: librechat
+    chart: oci://ghcr.io/danny-avila/librechat-chart/librechat
+    version: 0.1.0
+    condition: ENABLE_LIBRECHAT
+    labels:
+      tier: ai

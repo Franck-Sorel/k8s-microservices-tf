@@ -1,0 +1,17 @@
+name: minio
+category: storage
+description: S3-compatible object storage
+namespace: minio
+enabled_by_default: false
+profiles: [storage, ai, full]
+depends_on: []
+conflicts_with: []
+install_task: _apply-minio
+remove_task: _remove-minio
+status_task: _status-minio
+resources:
+  memory: 256Mi
+  cpu: 100m
+credentials:
+  rootUser: minioadmin
+  rootPassword: minioadmin

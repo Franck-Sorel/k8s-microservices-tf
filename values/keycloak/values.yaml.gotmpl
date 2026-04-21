@@ -1,0 +1,15 @@
+{{- if .Values.ENABLE_KEYCLOAK }}
+postgresql:
+  enabled: false
+
+extraEnvVars:
+  - name: KC_DB_URL
+    value: jdbc:postgresql://keycloak-db-postgresql.keycloak-db.svc.cluster.local:5432/keycloak
+  - name: KC_DB_USERNAME
+    value: keycloak
+  - name: KC_DB_PASSWORD
+    valueFrom:
+      secretRef:
+        name: keycloak-db-postgresql
+        key: password
+{{- end }}
