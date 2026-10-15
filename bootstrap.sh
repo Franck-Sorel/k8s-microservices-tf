@@ -29,13 +29,13 @@ check_prereqs() {
 prompt_cluster() {
     echo ""
     echo "=== Cluster Configuration ==="
-    read -p "Use existing cluster or create new? [y/n]: " -n 1 -r
+    read -r -p "Use existing cluster or create new? [y/n]: " -n 1
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        read -p "Cluster name [dev]: " CLUSTER_NAME
+        read -r -p "Cluster name [dev]: " CLUSTER_NAME
         CLUSTER_NAME=${CLUSTER_NAME:-dev}
         log_info "Creating cluster '$CLUSTER_NAME'..."
-        k3d cluster create $CLUSTER_NAME \
+        k3d cluster create "$CLUSTER_NAME" \
             --agents 1 \
             -p "8080:80@loadbalancer" \
             -p "8443:443@loadbalancer" \
@@ -43,8 +43,8 @@ prompt_cluster() {
             --kubeconfig-switch-context
     else
         k3d cluster list
-        read -p "Select cluster name: " CLUSTER_NAME
-        kubectl use context $CLUSTER_NAME 2>/dev/null || k3d cluster list
+        read -r -p "Select cluster name: " CLUSTER_NAME
+        kubectl config use-context "k3d-$CLUSTER_NAME" 2>/dev/null || k3d cluster list
     fi
 }
 
@@ -93,7 +93,7 @@ prompt_profile() {
     echo "1) minimal  - cert-manager only"
     echo "2) auth     - cert-manager + Keycloak"
     echo "3) full     - all components"
-    read -p "Select profile [1-3]: " choice
+    read -r -p "Select profile [1-3]: " choice
     case $choice in
         1) PROFILE="minimal";;
         2) PROFILE="auth";;
@@ -134,12 +134,18 @@ main() {
         exit 0
     fi
 
+    local tfvars="profiles/${PROFILE}.tfvars"
+    if [ ! -f "$tfvars" ]; then
+        log_error "Profile file '$tfvars' not found"
+        exit 1
+    fi
+
     log_info "Initializing Terraform..."
     cd terraform
-    terraform init
+    terraform init -input=false
 
     log_info "Applying profile: $PROFILE"
-    terraform apply -auto-approve -var-file=profiles/${PROFILE}.tfvars
+    terraform apply -auto-approve -var-file="$tfvars"
 
     log_info "Done! Use 'make status' to check resources"
 }

@@ -8,6 +8,8 @@ node_modules/
 *.tfvars
 *.tfvars.json
 .terraform.lock.hcl
+# Profile tfvars are versioned source configs (referenced by bootstrap.sh + tests).
+!terraform/profiles/*.tfvars
 
 # Helm
 *.tgz

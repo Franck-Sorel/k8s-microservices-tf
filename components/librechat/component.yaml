@@ -4,11 +4,11 @@ description: AI chat interface
 namespace: librechat
 enabled_by_default: false
 profiles: [ai, full]
-depends_on: [mongodb, meilisearch]
+depends_on: []
 conflicts_with: []
 install_task: _apply-librechat
 remove_task: _remove-librechat
-status_task: _status-librechat
+status_task: status-librechat
 resources:
   memory: 512Mi
   cpu: 250m

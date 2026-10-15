@@ -167,20 +167,65 @@ Creates test realm with:
 - `admin` user (password: admin)
 - `testuser` user (password: test123)
 
+## Testing
+
+End-to-end workflow tests live in `tests/`. They validate that every automation
+layer (Taskfile, Makefile, helmfile, Terraform, component registry, shell
+scripts) agrees and, when a cluster is available, exercise the full
+apply → verify → teardown journey.
+
+```bash
+make test            # full suite (offline + live E2E)
+make test-static     # offline tests only (no cluster needed)
+make test-live       # live cluster E2E only
+```
+
+Or via Task:
+
+```bash
+task test            # full suite
+task test-static
+task test-live
+```
+
+Suites:
+
+| Suite | What it checks |
+|-------|----------------|
+| `static` | component registry ↔ Taskfile ↔ platform.yaml consistency |
+| `terraform` | `terraform validate`/`fmt` + profile `.tfvars` completeness |
+| `shell` | `bash -n` + `shellcheck` on `bootstrap.sh` & `wizard.sh` |
+| `docs` | README, helmfile, values templates, manifests consistency |
+| `live` | real cluster: create → apply profile → verify pods/services → teardown (skipped without a cluster) |
+
+Run a single suite: `tests/run.sh terraform`. The suite is also wired into GitHub
+Actions (`.github/workflows/e2e.yml`): the offline suites run on every push/PR,
+and the live cluster E2E runs automatically on GitHub-hosted runners too — each
+profile (`minimal`, `auth`, `storage`) as its own parallel job that spins up a
+throwaway k3d cluster, verifies, and tears it down. It can also be triggered
+manually via `workflow_dispatch`.
+
 ## Architecture
 
 ```
 .
 ├── platform.yaml           # State descriptor
 ├── Taskfile.yml          # Commands
+├── Makefile              # Terraform + test entry points
 ├── components/          # Registry
 │   ├── keycloak/
 │   ├── minio/
 │   └── ...
+├── terraform/           # IaC (profiles/*.tfvars)
+├── helmfile.yaml        # Alternative helm orchestration
 ├── values/             # Helm values
 ├── manifests/          # Manifests
 ├── scripts/
 │   └── wizard.sh
+├── tests/              # End-to-end workflow tests
+│   ├── run.sh
+│   └── test_workflow_*.sh
+├── .github/workflows/  # CI (offline + live E2E)
 └── .platform/
     └── state/         # State tracking
 ```

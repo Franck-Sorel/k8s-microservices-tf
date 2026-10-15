@@ -1,11 +1,14 @@
-.PHONY: help up destroy status apply check-env cluster-create cluster-delete info
+.PHONY: help up destroy status apply check-env cluster-create cluster-delete info test test-live test-static
 
 SHELL := /bin/bash
 TF := terraform
 K3D_CLUSTER ?= dev
 K3D_AGENTS ?= 1
-KUBECONFIG_PATH := $(HOME)/.kubeconfig
+# k3d writes to ~/.kube/config by default; terraform/providers.tf reads the same
+# path. Keep KUBECONFIG in sync so kubectl/k3d and terraform all see one config.
+KUBECONFIG_PATH := $(HOME)/.kube/config
 export KUBECONFIG := $(KUBECONFIG_PATH)
+PROFILE ?= minimal
 
 help:
 	@echo "Local Kubernetes Platform Bootstrap"
@@ -57,12 +60,12 @@ up: check-env
 	@$(MAKE) apply
 
 apply:
-	@echo "=== Applying Terraform ==="
-	@cd terraform && $(TF) apply -auto-approve -var-file=profiles/$(PROFILE).tfvars || true
+	@echo "=== Applying Terraform (profile: $(PROFILE)) ==="
+	@cd terraform && $(TF) apply -auto-approve -var-file=profiles/$(PROFILE).tfvars
 
 destroy:
 	@echo "=== Destroying platform ==="
-	@cd terraform && $(TF) destroy -auto-approve || true
+	@cd terraform && $(TF) destroy -auto-approve
 	@$(MAKE) cluster-delete
 
 status:
@@ -78,3 +81,20 @@ info:
 	@echo "Cluster: $(K3D_CLUSTER)"
 	@echo "Kubeconfig: $(KUBECONFIG)"
 	@kubectl config current-context 2>/dev/null || true
+
+# ===========================================================
+# END-TO-END WORKFLOW TESTS
+# ===========================================================
+test:
+	@echo "Running end-to-end workflow test suite..."
+	@bash tests/run.sh
+
+# Run the live cluster E2E only (creates a throwaway cluster).
+test-live:
+	@echo "Running live cluster E2E..."
+	@bash tests/run.sh live
+
+# Run offline (static/terraform/shell/docs) tests only.
+test-static:
+	@echo "Running offline workflow tests..."
+	@E2E_SKIP_LIVE=1 bash tests/run.sh

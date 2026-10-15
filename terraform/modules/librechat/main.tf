@@ -45,7 +45,7 @@ resource "helm_release" "librechat" {
   name             = "librechat"
   repository       = "https://danny-avila.github.io/librechat-chart"
   chart            = "librechat"
-  version         = "0.1.0"
+  version          = "0.1.0"
   namespace        = kubernetes_namespace.librechat.metadata.0.name
   create_namespace = false
 

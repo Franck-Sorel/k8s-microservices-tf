@@ -21,7 +21,7 @@ module "minio" {
 
   depends_on = []
 
-  root_user    = var.minio_root_user
+  root_user     = var.minio_root_user
   root_password = var.minio_root_password
 }
 
@@ -41,7 +41,7 @@ module "keycloak" {
   depends_on = [module.keycloak_operator, module.cnpg]
 
   admin_password = var.keycloak_admin_password
-  db_password   = var.keycloak_db_password
+  db_password    = var.keycloak_db_password
 }
 
 module "librechat" {
@@ -52,5 +52,5 @@ module "librechat" {
   depends_on = [module.minio]
 
   admin_email    = var.librechat_admin_email
-  admin_password = var.librechatAdminPassword
+  admin_password = var.librechat_admin_password
 }

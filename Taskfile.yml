@@ -492,8 +492,26 @@ tasks:
     desc: Remove all releases
     cmds:
       - cmd: |
-          for rel in cert-manager traefik cnpg minio redis keycloak keycloak-db librechat; do
-            helm uninstall $rel -n ${rel} 2>/dev/null || true
-            helm uninstall $rel -n ${rel}-db 2>/dev/null || true
+          for rel in cert-manager traefik cnpg minio redis keycloak librechat; do
+            helm uninstall $rel -n $rel 2>/dev/null || true
           done
+          helm uninstall keycloak-db -n keycloak-db 2>/dev/null || true
           echo "All releases removed"
+
+  # ===========================================================
+  # END-TO-END WORKFLOW TESTS
+  # ===========================================================
+  test:
+    desc: Run end-to-end workflow test suite
+    cmds:
+      - cmd: bash tests/run.sh
+
+  test-live:
+    desc: Run live cluster E2E only
+    cmds:
+      - cmd: bash tests/run.sh live
+
+  test-static:
+    desc: Run offline workflow tests only
+    cmds:
+      - cmd: E2E_SKIP_LIVE=1 bash tests/run.sh

@@ -44,14 +44,14 @@ variable "keycloak_admin_password" {
   description = "Keycloak admin password"
   type        = string
   default     = ""
-  sensitive  = true
+  sensitive   = true
 }
 
 variable "keycloak_db_password" {
   description = "Keycloak database password"
   type        = string
   default     = ""
-  sensitive  = true
+  sensitive   = true
 }
 
 variable "minio_root_user" {
@@ -73,7 +73,7 @@ variable "librechat_admin_email" {
   default     = "admin@example.com"
 }
 
-variable "librechatAdminPassword" {
+variable "librechat_admin_password" {
   description = "LibreChat admin password"
   type        = string
   default     = ""

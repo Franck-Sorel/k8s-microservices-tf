@@ -8,7 +8,7 @@ depends_on: []
 conflicts_with: []
 install_task: _apply-cert-manager
 remove_task: _remove-cert-manager
-status_task: _status-cert-manager
+status_task: status-cert-manager
 resources:
   memory: 200Mi
   cpu: 100m

@@ -1,0 +1,83 @@
+name: End-to-End Workflow Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ------------------------------------------------------------------
+  # Offline workflow tests: static/terraform/shell/docs consistency.
+  # No cluster needed. Runs on every push and PR.
+  # ------------------------------------------------------------------
+  offline:
+    name: Offline workflow tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.5
+
+      - name: Run workflow tests (live E2E skipped)
+        run: E2E_SKIP_LIVE=1 bash tests/run.sh
+
+      - name: Verify terraform formatting
+        run: terraform -chdir=terraform fmt -check -recursive
+
+  # ------------------------------------------------------------------
+  # Live end-to-end workflow test: spins up a throwaway k3d cluster and
+  # exercises the full apply -> verify -> teardown journey.
+  #
+  # Runs on GitHub-hosted ubuntu runners (Docker is available, so k3d
+  # works) on every push/PR and on manual dispatch. Each profile is an
+  # independent job so they run in parallel and fail independently.
+  # ------------------------------------------------------------------
+  live:
+    name: Live E2E (profile ${{ matrix.profile }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [minimal, auth, storage]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install k3d
+        run: |
+          curl -sfL https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+          k3d version
+
+      - name: Install kubectl
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y kubectl
+          kubectl version --client
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.4
+
+      - name: Run live cluster E2E
+        run: |
+          E2E_CLUSTER="e2e-ci-${{ matrix.profile }}" \
+          E2E_PROFILE="${{ matrix.profile }}" \
+          E2E_TIMEOUT=600 \
+          bash tests/run.sh live
+
+      - name: Upload E2E logs on failure
+        if: failure()
+        run: |
+          echo "E2E failed for profile ${{ matrix.profile }}"
+          k3d cluster list 2>/dev/null || true

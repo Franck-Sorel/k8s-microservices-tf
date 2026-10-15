@@ -28,8 +28,8 @@ resource "helm_release" "keycloak_db" {
   name             = "keycloak-db"
   repository       = "https://charts.bitnami.com/bitnami"
   chart            = "postgresql"
-  version         = "18.5.24"
-  namespace       = "keycloak-db"
+  version          = "18.5.24"
+  namespace        = "keycloak-db"
   create_namespace = true
 
   set {
@@ -57,8 +57,8 @@ resource "helm_release" "keycloak" {
   name             = "keycloak"
   repository       = "https://codecentric.github.io/helm-charts"
   chart            = "keycloak"
-  version         = "32.0.0"
-  namespace       = kubernetes_namespace.keycloak.metadata.0.name
+  version          = "32.0.0"
+  namespace        = kubernetes_namespace.keycloak.metadata.0.name
   create_namespace = false
 
   set {

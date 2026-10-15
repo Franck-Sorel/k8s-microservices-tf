@@ -8,7 +8,7 @@ depends_on: []
 conflicts_with: []
 install_task: _apply-keycloak-db
 remove_task: _remove-keycloak-db
-status_task: _status-keycloak-db
+status_task: status-keycloak-db
 resources:
   memory: 256Mi
   cpu: 100m

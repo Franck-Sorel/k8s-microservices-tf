@@ -38,15 +38,15 @@ prompt_cluster() {
     read -p "Use existing cluster? [Y/n]: " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Nn]$ ]]; then
-        read -p "New cluster name [dev]: " CLUSTER_NAME
+        read -r -p "New cluster name [dev]: " CLUSTER_NAME
         CLUSTER_NAME=${CLUSTER_NAME:-dev}
         log_info "Creating cluster '$CLUSTER_NAME'..."
-        k3d cluster create $CLUSTER_NAME --agents 1 -p "8080:80@loadbalancer" -p "8443:443@loadbalancer"
+        k3d cluster create "$CLUSTER_NAME" --agents 1 -p "8080:80@loadbalancer" -p "8443:443@loadbalancer"
     else
         k3d cluster list
-        read -p "Select cluster name: " SELECTED_CLUSTER
+        read -r -p "Select cluster name: " SELECTED_CLUSTER
         SELECTED_CLUSTER=${SELECTED_CLUSTER:-dev}
-        kubectl config use-context k3d-$SELECTED_CLUSTER 2>/dev/null || true
+        kubectl config use-context "k3d-$SELECTED_CLUSTER" 2>/dev/null || true
     fi
 }
 
