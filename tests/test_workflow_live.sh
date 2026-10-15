@@ -20,6 +20,7 @@ begin_file "${BASH_SOURCE[0]}"
 E2E_CLUSTER="${E2E_CLUSTER:-e2e-test}"
 E2E_PROFILE="${E2E_PROFILE:-minimal}"
 E2E_TIMEOUT="${E2E_TIMEOUT:-300}"
+HELM_LOG="$(mktemp)"
 
 # --- environment gate -------------------------------------------------
 missing=""
@@ -121,21 +122,35 @@ else
   fail "cluster API not reachable within 120s"
 fi
 
+echo "--- initialize helm repos (mirrors Taskfile _init-repos) ---"
+helm repo add jetstack https://charts.jetstack.io >/dev/null 2>&1 || true
+helm repo add codecentric https://codecentric.github.io/helm-charts >/dev/null 2>&1 || true
+helm repo add bitnami https://charts.bitnami.com/bitnami >/dev/null 2>&1 || true
+helm repo add cloudnative-pg https://cloudnative-pg.github.io/charts >/dev/null 2>&1 || true
+helm repo add traefik https://traefik.github.io/charts >/dev/null 2>&1 || true
+helm repo update >/dev/null 2>&1 || true
+if helm repo list >/dev/null 2>&1; then
+  ok "helm repos initialized"
+else
+  fail "helm repo init failed"
+fi
+
 echo "--- apply profile via the Taskfile path (helm _apply-*) ---"
 # Mirror 'task profile PROFILE=...' using the exact helm commands the Taskfile runs.
+# Helm output is appended to $HELM_LOG so failures are diagnosable.
 apply_profile() {
   case "$E2E_PROFILE" in
     minimal) kubectl create namespace cert-manager >/dev/null 2>&1 || true
              helm upgrade --install cert-manager jetstack/cert-manager \
                --namespace cert-manager --version v1.15.0 \
-               --set crds.enabled=true --wait --timeout 5m >/dev/null 2>&1
+               --set crds.enabled=true --wait --timeout 5m >>"$HELM_LOG" 2>&1
              ;;
     auth)    apply_profile minimal
              kubectl create namespace keycloak-db >/dev/null 2>&1 || true
              helm upgrade --install keycloak-db bitnami/postgresql \
                --namespace keycloak-db --set auth.username=keycloak \
                --set auth.password=keycloak123 --set auth.database=keycloak \
-               --set primary.persistence.size=5Gi --wait --timeout 5m >/dev/null 2>&1
+               --set primary.persistence.size=5Gi --wait --timeout 5m >>"$HELM_LOG" 2>&1
              kubectl create namespace keycloak >/dev/null 2>&1 || true
              helm upgrade --install keycloak codecentric/keycloak \
                --namespace keycloak --version 32.0.0 --set postgresql.enabled=false \
@@ -144,28 +159,28 @@ apply_profile() {
                --set 'extraEnvVars[1].name=KC_DB_USERNAME' \
                --set 'extraEnvVars[1].value=keycloak' \
                --set 'extraEnvVars[2].name=KC_DB_PASSWORD' \
-               --set 'extraEnvVars[2].value=keycloak123' --wait --timeout 10m >/dev/null 2>&1
+               --set 'extraEnvVars[2].value=keycloak123' --wait --timeout 10m >>"$HELM_LOG" 2>&1
              ;;
     storage) kubectl create namespace minio >/dev/null 2>&1 || true
              helm upgrade --install minio bitnami/minio \
                --namespace minio --set auth.rootUser=minioadmin \
                --set auth.rootPassword=minioadmin --set service.type=ClusterIP \
-               --set persistence.size=5Gi --wait --timeout 5m >/dev/null 2>&1
+               --set persistence.size=5Gi --wait --timeout 5m >>"$HELM_LOG" 2>&1
              ;;
     full)    # Install the full set (same set as apply-full), tolerating partial
              # failures from third-party charts that need internet.
              apply_profile minimal
              kubectl create namespace traefik >/dev/null 2>&1 || true
              helm upgrade --install traefik traefik/traefik \
-               --namespace traefik --version 30.0.0 --wait --timeout 5m >/dev/null 2>&1 || true
+               --namespace traefik --version 30.0.0 --wait --timeout 5m >>"$HELM_LOG" 2>&1 || true
              kubectl create namespace cnpg-system >/dev/null 2>&1 || true
              helm upgrade --install cnpg cloudnative-pg/cloudnative-pg \
-               --namespace cnpg-system --version 1.22.1 --wait --timeout 5m >/dev/null 2>&1 || true
+               --namespace cnpg-system --version 1.22.1 --wait --timeout 5m >>"$HELM_LOG" 2>&1 || true
              apply_profile storage
              kubectl create namespace redis >/dev/null 2>&1 || true
              helm upgrade --install redis bitnami/redis \
                --namespace redis --set auth.password=redis123 \
-               --set architecture=standalone --wait --timeout 5m >/dev/null 2>&1 || true
+               --set architecture=standalone --wait --timeout 5m >>"$HELM_LOG" 2>&1 || true
              apply_profile auth
              ;;
   esac
@@ -174,6 +189,8 @@ if apply_profile; then
   ok "profile '$E2E_PROFILE' applied (helm releases installed)"
 else
   fail "profile '$E2E_PROFILE' apply failed"
+  echo "  --- helm log (last 30 lines) ---"
+  tail -30 "$HELM_LOG" | sed 's/^/    /'
 fi
 
 echo "--- verify expected namespaces and pods become ready ---"
